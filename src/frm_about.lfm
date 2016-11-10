@@ -1,0 +1,95 @@
+object frmAbout: TfrmAbout
+  Left = 478
+  Height = 418
+  Top = 243
+  Width = 529
+  HorzScrollBar.Visible = False
+  VertScrollBar.Visible = False
+  BorderStyle = bsToolWindow
+  Caption = 'About'
+  ClientHeight = 418
+  ClientWidth = 529
+  Color = clWhite
+  OnCreate = FormCreate
+  OnShow = FormShow
+  Position = poMainFormCenter
+  LCLVersion = '1.6.0.4'
+  object pnlHeader: TPanel
+    Left = 8
+    Height = 52
+    Top = 8
+    Width = 512
+    BevelOuter = bvNone
+    Caption = 'LCD Scanlines'
+    ClientHeight = 52
+    ClientWidth = 512
+    Color = clSkyBlue
+    Font.CharSet = TURKISH_CHARSET
+    Font.Height = -19
+    Font.Name = 'Verdana'
+    Font.Pitch = fpVariable
+    Font.Quality = fqDraft
+    ParentColor = False
+    ParentFont = False
+    TabOrder = 0
+    object lblBeta: TLabel
+      Left = 342
+      Height = 16
+      Top = 19
+      Width = 35
+      Anchors = [akRight, akBottom]
+      Caption = 'alpha'
+      Font.CharSet = TURKISH_CHARSET
+      Font.Height = -13
+      Font.Name = 'Verdana'
+      Font.Pitch = fpVariable
+      Font.Quality = fqDraft
+      Font.Style = [fsItalic]
+      ParentColor = False
+      ParentFont = False
+    end
+  end
+  object memoDesc: TMemo
+    Left = 8
+    Height = 272
+    Top = 80
+    Width = 512
+    BorderStyle = bsNone
+    Font.CharSet = TURKISH_CHARSET
+    Font.Height = -12
+    Font.Name = 'Arial'
+    Font.Pitch = fpVariable
+    Font.Quality = fqDraft
+    Lines.Strings = (
+      ''
+      'LCD Scanlines is an image upscaler that takes advantage of scanlines to increase '
+      'resolution of images.'
+      ''
+      'It demonstrates a dynamic scanline generation algorithm where brightness of each black '
+      'line pixel is calculated by summing the illumination coming from adjacent active pixels. The '
+      'resulting image is suitable for viewing on most flat-panel displays and high-resolution '
+      'projectors.'
+      ''
+      'You can access additional documentation and download latest GPL-licensed source code at '
+      'this address:'
+      'https://github.com/srcstorm/lcd_scanlines'
+      ''
+      'Version: 0.1'
+      'Build: 2016-11-10'
+    )
+    ParentFont = False
+    ReadOnly = True
+    TabOrder = 1
+  end
+  object btnClose: TBitBtn
+    Left = 226
+    Height = 30
+    Top = 368
+    Width = 75
+    Default = True
+    DefaultCaption = True
+    Kind = bkOK
+    ModalResult = 1
+    TabOrder = 2
+  end
+end
