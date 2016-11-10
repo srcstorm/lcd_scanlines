@@ -1,4 +1,4 @@
-# lcd_scanlines
+# LCD Scanlines
 Dynamic scanline generation for LCD
 
 LCD Scanlines is an image upscaler that takes advantage of scanlines to increase 
