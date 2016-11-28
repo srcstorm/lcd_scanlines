@@ -11,9 +11,11 @@ object frmPreview: TfrmPreview
   ClientHeight = 150
   ClientWidth = 150
   Color = clBlack
+  OnClose = FormClose
   OnCreate = FormCreate
+  OnHide = FormHide
   OnKeyPress = FormKeyPress
-  LCLVersion = '1.6.0.4'
+  LCLVersion = '1.6.2.0'
   object imgPreview: TImage
     Left = 0
     Height = 128

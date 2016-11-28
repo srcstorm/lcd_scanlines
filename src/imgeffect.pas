@@ -48,8 +48,8 @@ implementation
 const
   SRCMINX = 1;
   SRCMINY = 1;
-  SRCMAXX = 1024;
-  SRCMAXY = 1024;
+  SRCMAXX = 2048;
+  SRCMAXY = 2048;
 
 procedure SetXY(var v: TPoint; const x, y: integer);
 begin
@@ -69,7 +69,6 @@ begin
   if (sh > sMaxSize.y) then
     sh := sMaxSize.y;
   SetXY(sSize, sw, sh);
-//  sImg.SetSize(sw, sh);
 end;
 
 procedure TImgEffect.SetTargetSize(tw, th: integer);

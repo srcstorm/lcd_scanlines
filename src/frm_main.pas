@@ -12,7 +12,7 @@ uses
   // various graphics functions & types
   LCLIntf, LCLType, StdCtrls, ComCtrls, Spin, ActnList,
   // project units
-  imgeffect, dynscanlines,
+  imgeffect, dynscanlines, srgb,
   frm_preview, frm_about;
 
 const
@@ -41,12 +41,14 @@ type
     btnPreview: TBitBtn;
     cbPreset: TComboBox;
     cbSFactor: TComboBox;
+    cbColorSpace: TComboBox;
     fseBrightAbove: TFloatSpinEdit;
     fseBrightBelow: TFloatSpinEdit;
     gboxBrightness: TGroupBox;
     gboxOutputImg: TGroupBox;
     grpMessages: TGroupBox;
     imgSrc: TImage;
+    lblColorSpace: TLabel;
     lblSFactor: TLabel;
     lblBrightAbove: TLabel;
     lblBrightBelow: TLabel;
@@ -71,6 +73,7 @@ type
     procedure actionOpenFileExecute(Sender: TObject);
     procedure actionPasteExecute(Sender: TObject);
     procedure actionPreviewExecute(Sender: TObject);
+    procedure cbColorSpaceChange(Sender: TObject);
     procedure cbPresetChange(Sender: TObject);
     procedure cbSFactorChange(Sender: TObject);
     procedure fseBrightAboveEditingDone(Sender: TObject);
@@ -85,6 +88,8 @@ type
     effect: TImgEffect;
     dsDefaults: TDSSettings;
     preset, editing: boolean;
+    startTime, elapsedTime: integer;
+    procedure LoadImgFromFile(path: string);
     procedure UIStartCommand;
     procedure UIEndCommand;
     procedure UISourceImageLoaded;
@@ -110,40 +115,49 @@ implementation
 procedure TfrmMain.actionOpenFileExecute(Sender: TObject);
 begin
   if openDlgSrcImage.Execute then
-  begin
-
     // If a file is selected...
+{$IFDEF UNIX}
+    if FileExists(openDlgSrcImage.FileName) then
+{$ELSE}
     if (openDlgSrcImage.Files.Count = 1) and (FileExists(openDlgSrcImage.FileName)) then
-    begin
-
-      UIStartCommand;
-      LogMessage(lmtInfo, 'Loading source image from file: ' + openDlgSrcImage.FileName);
-      imgSrc.Picture.LoadFromFile(openDlgSrcImage.FileName);
-      UISourceImageLoaded;
-      UIEndCommand;
-
-    end;
-  end;
-
+{$ENDIF}
+      LoadImgFromFile(openDlgSrcImage.FileName);
 end;
 
 procedure TfrmMain.actionPasteExecute(Sender: TObject);
 var
   tempBitmap: TBitmap;
-  PictureAvailable: boolean = False;
+//  tempPicture: TPicture;
+  formatID: TClipboardFormat;
+  pictureAvailable: boolean;
 begin
+  formatID := Clipboard.FindPictureFormatID;
+  if IMGDEBUG = 1 then
+    LogMessage(lmtDebug, 'Picture format ID: ' + inttostr(formatID));
+{
+  tempPicture := TPicture.Create;
+  if formatID > 0 then
+  begin
+    LogMessage(lmtInfo, 'Getting source image from clipboard.');
+    tempPicture.LoadFromClipboardFormat(formatID);
+    imgSrc.Width := tempPicture.Bitmap.Width;
+    imgSrc.Height := tempPicture.Bitmap.Height;
+    imgSrc.Picture.Bitmap.Assign(tempPicture.Bitmap);
+    tempPicture.Free;
+    UISourceImageLoaded;
+    UIEndCommand;
+  end;
+}
 
   // we determine if any image is on clipboard
-  if (Clipboard.HasFormat(PredefinedClipboardFormat(pcfDelphiBitmap))) or
-     (Clipboard.HasFormat(PredefinedClipboardFormat(pcfBitmap))) then
-    PictureAvailable := True;
+  pictureAvailable := (Clipboard.HasFormat(PredefinedClipboardFormat(pcfDelphiBitmap))) or
+                      (Clipboard.HasFormat(PredefinedClipboardFormat(pcfBitmap)));
 
-
-  if PictureAvailable then
+  if pictureAvailable then
   begin
 
-    UIStartCommand;
     LogMessage(lmtInfo, 'Getting source image from clipboard.');
+    UIStartCommand;
     tempBitmap := TBitmap.Create;
 
     if Clipboard.HasFormat(PredefinedClipboardFormat(pcfDelphiBitmap)) then
@@ -166,13 +180,10 @@ begin
     UIEndCommand;
 
   end
+  else if formatID > 0 then
+    ShowMessage('Unsupported picture format: ' + inttostr(formatID))
   else
-  begin
-
     ShowMessage('No image is found on clipboard.');
-
-  end;
-
 end;
 
 procedure TfrmMain.actionPreviewExecute(Sender: TObject);
@@ -182,8 +193,8 @@ var
 begin
   if editing then
     exit;
-  UIStartCommand;
   LogMessage(lmtInfo, 'Applying dynamic scanline filter with ' + cbSFactor.Text + 'x upscaling.');
+  UIStartCommand;
 
   inImg := imgSrc.Picture.Bitmap;
   with effect.GetSourceMaxSize do
@@ -193,6 +204,7 @@ begin
       LogMessage(lmtInfo, 'Source image will be cropped.');
     end;
 
+  startTime := GetTickCount;
   try
     outImg := effect.ApplyEffect(inImg);
   except
@@ -203,9 +215,12 @@ begin
       exit;
     end;
   end;
+  elapsedTime := GetTickCount - startTime;
 
   with effect.GetEffectSize do
     LogMessage(lmtInfo, 'Resolution of output image: ' + inttostr(x) + 'x' + inttostr(y));
+  if IMGDEBUG = 1 then
+    LogMessage(lmtDebug, 'Elapsed time in milliseconds: ' + inttostr(elapsedTime));
 
   preview := frmPreview.imgPreview;
   preview.Width := outImg.Width;
@@ -213,7 +228,6 @@ begin
   preview.Picture.Bitmap.Assign(outImg);
 
   frmPreview.UILoadImg(cbSFactor.Text + 'x ' + effect.GetEffectName);
-  frmPreview.Show;
   frmPreview.DoClosePreview := @actionClosePreviewExecute;
   Show;
   UIPreviewCreated;
@@ -233,21 +247,35 @@ begin
   end
   else if cbPreset.Text = 'Bright' then
   begin
-    dsEffect.SetBrightnessFromAboveLine(63.75);
-    dsEffect.SetBrightnessFromBelowLine(63.75);
+    dsEffect.SetBrightnessFromAboveLine(0.25); // 63.75
+    dsEffect.SetBrightnessFromBelowLine(0.25); // 63.75
   end
   else if cbPreset.Text = 'Dark' then
   begin
-    dsEffect.SetBrightnessFromAboveLine(43.75);
-    dsEffect.SetBrightnessFromBelowLine(43.75);
+    dsEffect.SetBrightnessFromAboveLine(0.171568); // 43.75
+    dsEffect.SetBrightnessFromBelowLine(0.171568); // 43.75
+  end
+  else if cbPreset.Text = 'Full' then
+  begin
+    dsEffect.SetBrightnessFromAboveLine(0.5); // 127.5
+    dsEffect.SetBrightnessFromBelowLine(0.5); // 127.5
   end
   else
   begin
     preset := false;
-    dsEffect.SetBrightnessFromAboveLine(fseBrightAbove.Value);
-    dsEffect.SetBrightnessFromBelowLine(fseBrightBelow.Value);
+    dsEffect.SetBrightnessFromAboveLine(fseBrightAbove.Value / 255);
+    dsEffect.SetBrightnessFromBelowLine(fseBrightBelow.Value / 255);
   end;
   UIChangeSettings;
+end;
+
+procedure TfrmMain.cbColorSpaceChange(Sender: TObject);
+begin
+  with TDynScanlines(effect) do
+    if cbColorSpace.Text = 'sRGB' then
+      SetColorSpace(csSRGB)
+    else
+      SetColorSpace(csLinearRGB);
 end;
 
 procedure TfrmMain.cbSFactorChange(Sender: TObject);
@@ -255,36 +283,19 @@ begin
   TDynScanlines(effect).SetScalingFactor(strtoint(cbSFactor.Text));
 end;
 
-{
 procedure TfrmMain.actionCopyExecute(Sender: TObject);
 var
-  bmpFrom: TImage;
-  bmpTo: TBitmap;
+  mimeType: string;
+  formatID: TClipboardFormat;
 begin
-
-  UIStartCommand;
   LogMessage(lmtInfo, 'Copying preview image to clipboard.');
-  bmpFrom := frmPreview.imgPreview;
-  bmpTo := TBitmap.Create;
-
-  bmpTo.Width := bmpFrom.Width;
-  bmpTo.Height := bmpFrom.Height;
-  bmpTo.Canvas.Draw(0,0,bmpFrom.Picture.Graphic);
-
-  //Clipboard.Clear;
-  Clipboard.Assign(bmpTo);
-
-  bmpTo.Free;
-  ShowMessage('Preview image successfully copied to clipboard.');
-  UIEndCommand;
-
-end;
-}
-
-procedure TfrmMain.actionCopyExecute(Sender: TObject);
-begin
+  if IMGDEBUG = 1 then
+  begin
+    mimeType := effect.GetEffect.MimeType;
+    formatID := ClipboardRegisterFormat(mimeType);
+    LogMessage(lmtDebug, 'Mime type: ' + mimeType + ' (' + inttostr(formatID) + ')');
+  end;
   UIStartCommand;
-  LogMessage(lmtInfo, 'Copying preview image to clipboard.');
   Clipboard.Assign(effect.GetEffect);
   ShowMessage('Preview image successfully copied to clipboard.');
   UIEndCommand;
@@ -292,9 +303,8 @@ end;
 
 procedure TfrmMain.actionClosePreviewExecute(Sender: TObject);
 begin
-  UIStartCommand;
   LogMessage(lmtInfo, 'Closing preview window.');
-  frmPreview.Hide;
+  UIStartCommand;
   frmPreview.UIUnloadImg;
   UIPreviewClosed;
   UIEndCommand;
@@ -329,8 +339,13 @@ begin
   end;
 
   pagecMain.ActivePage := tabsSourceImg;
-  LogMessage(lmtHint, 'In order to create a scanline effect, first you need to load a source image.');
-  ActiveControl := btnOpen;
+  if paramcount < 1 then
+  begin
+    LogMessage(lmtHint, 'In order to create a scanline effect, first you need to load a source image.');
+    ActiveControl := btnOpen;
+  end
+  else
+    LoadImgFromFile(paramstr(1));
 end;
 
 procedure TfrmMain.FormDestroy(Sender: TObject);
@@ -338,15 +353,35 @@ begin
   effect.Free;
 end;
 
+procedure TfrmMain.LoadImgFromFile(path: string);
+begin
+  LogMessage(lmtInfo, 'Loading source image from file: ' + path);
+  UIStartCommand;
+
+  try
+    imgSrc.Picture.LoadFromFile(path);
+  except
+    on e: Exception do
+    begin
+      LogMessage(lmtError, e.Message);
+      UIEndCommand;
+      exit;
+    end;
+  end;
+
+  UISourceImageLoaded;
+  UIEndCommand;
+end;
+
 procedure TfrmMain.fseBrightAboveEditingDone(Sender: TObject);
 begin
-  TDynScanlines(effect).SetBrightnessFromAboveLine(fseBrightAbove.Value);
+  TDynScanlines(effect).SetBrightnessFromAboveLine(fseBrightAbove.Value / 255);
   UIChangeSettings;
 end;
 
 procedure TfrmMain.fseBrightBelowEditingDone(Sender: TObject);
 begin
-  TDynScanlines(effect).SetBrightnessFromBelowLine(fseBrightBelow.Value);
+  TDynScanlines(effect).SetBrightnessFromBelowLine(fseBrightBelow.Value / 255);
   UIChangeSettings;
 end;
 
@@ -415,8 +450,8 @@ begin
   gboxBrightness.Enabled := not preset;
   with TDynScanlines(effect) do
   begin
-    txtSettingAbove.Caption := FloatToStr(GetBrightnessFromAboveLine);
-    txtSettingBelow.Caption := FloatToStr(GetBrightnessFromBelowLine);
+    txtSettingAbove.Caption := FloatToStrF(GetBrightnessFromAboveLine * 100, ffFixed, 3, 4) + '%';
+    txtSettingBelow.Caption := FloatToStrF(GetBrightnessFromBelowLine * 100, ffFixed, 3, 4) + '%';
   end;
 end;
 
@@ -440,5 +475,4 @@ end;
 
 
 end.
-
 

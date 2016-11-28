@@ -13,19 +13,19 @@ object frmAbout: TfrmAbout
   OnCreate = FormCreate
   OnShow = FormShow
   Position = poMainFormCenter
-  LCLVersion = '1.6.0.4'
+  LCLVersion = '1.6.2.0'
   object pnlHeader: TPanel
     Left = 8
-    Height = 52
+    Height = 58
     Top = 8
     Width = 512
     BevelOuter = bvNone
     Caption = 'LCD Scanlines'
-    ClientHeight = 52
+    ClientHeight = 58
     ClientWidth = 512
     Color = clSkyBlue
     Font.CharSet = TURKISH_CHARSET
-    Font.Height = -19
+    Font.Height = -20
     Font.Name = 'Verdana'
     Font.Pitch = fpVariable
     Font.Quality = fqDraft
@@ -33,9 +33,9 @@ object frmAbout: TfrmAbout
     ParentFont = False
     TabOrder = 0
     object lblBeta: TLabel
-      Left = 342
+      Left = 344
       Height = 16
-      Top = 19
+      Top = 23
       Width = 35
       Anchors = [akRight, akBottom]
       Caption = 'alpha'
@@ -74,8 +74,8 @@ object frmAbout: TfrmAbout
       'this address:'
       'https://github.com/srcstorm/lcd_scanlines'
       ''
-      'Version: 0.1'
-      'Build: 2016-11-10'
+      'Version: 0.2'
+      'Build: 2016-11-27'
     )
     ParentFont = False
     ReadOnly = True

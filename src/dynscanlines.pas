@@ -6,17 +6,18 @@ interface
 
 uses
   Classes, SysUtils, FileUtil, Forms, Controls, Graphics,
-  imgeffect;
+  imgeffect, srgb;
 
 const
-  TGTWINDOWX_DS = 8192;
-  TGTWINDOWY_DS = 8192;
+  TGTWINDOWX_DS = 16384;
+  TGTWINDOWY_DS = 16384;
 
 type
 
   TDSSettings = record
     scalingFactor: integer;
     brightnessAbove, brightnessBelow: double;
+    colorSpace: TColorSpace;
   end;
 
   { TDynScanlines }
@@ -33,6 +34,8 @@ type
     procedure SetBrightnessFromAboveLine(ba: double);
     function GetBrightnessFromBelowLine: double;
     procedure SetBrightnessFromBelowLine(bb: double);
+    function GetColorSpace: TColorSpace;
+    procedure SetColorSpace(cs: TColorSpace);
     constructor Create(windowWidth: integer = TGTWINDOWX_DS; windowHeight: integer = TGTWINDOWY_DS); override;
   end;
 
@@ -45,38 +48,28 @@ const
   SRCMINY_DS = 2;
 
 type
-  TRGBColor = record
+  TColor8 = record
     r, g, b: byte;
   end;
 
-procedure Blend(var px1: TRGBColor; const px2: TRGBColor; const br1, br2: double);
+procedure Blend(var px1: TColor8; const px2: TColor8; const br1, br2: double; const cs: TColorSpace);
 var
   rt, gt, bt: double;
 begin
-  rt := (px2.r / 255) * br2;
-  gt := (px2.g / 255) * br2;
-  bt := (px2.b / 255) * br2;
+  rt := (DecodeColor(px1.r, cs) * br1) + (DecodeColor(px2.r, cs) * br2);
+  gt := (DecodeColor(px1.g, cs) * br1) + (DecodeColor(px2.g, cs) * br2);
+  bt := (DecodeColor(px1.b, cs) * br1) + (DecodeColor(px2.b, cs) * br2);
 
-  rt := ((px1.r / 255) * br1) + rt;
-  gt := ((px1.g / 255) * br1) + gt;
-  bt := ((px1.b / 255) * br1) + bt;
+  if (rt > 1) then rt := 1
+  else if (rt < 0) then rt := 0;
+  if (gt > 1) then gt := 1
+  else if (gt < 0) then gt := 0;
+  if (bt > 1) then bt := 1
+  else if (bt < 0) then bt := 0;
 
-  if (rt > 255) then
-    rt := 255
-  else if (rt < 0) then
-    rt := 0;
-  if (gt > 255) then
-    gt := 255
-  else if (gt < 0) then
-    gt := 0;
-  if (bt > 255) then
-    bt := 255
-  else if (bt < 0) then
-    bt := 0;
-
-  px1.r := byte(trunc(rt));
-  px1.g := byte(trunc(gt));
-  px1.b := byte(trunc(bt));
+  px1.r := byte(EncodeColor(rt, csLinearRGB));
+  px1.g := byte(EncodeColor(gt, csLinearRGB));
+  px1.b := byte(EncodeColor(bt, csLinearRGB));
 end;
 
 { TDynScanlines }
@@ -90,7 +83,7 @@ var
   sCoor, tCoor: TPoint;
   px: TColor; // Active pixel
   pxs, // Black line pixel
-  pxb: TRGBColor; // Pixel below
+  pxb: TColor8; // Pixel below
 begin
   sf := settings.scalingFactor;
   SetTargetSize(sSize.x * sf, (sSize.y * sf) - (sf div 2));
@@ -110,7 +103,7 @@ begin
       px := sImg.Canvas.Pixels[sCoor.x, sCoor.y];
       RedGreenBlue(px, pxs.r, pxs.g, pxs.b);
       RedGreenBlue(sImg.Canvas.Pixels[sCoor.x, sCoor.y + 1], pxb.r, pxb.g, pxb.b);
-      Blend(pxs, pxb, settings.brightnessAbove, settings.brightnessBelow);
+      Blend(pxs, pxb, settings.brightnessAbove, settings.brightnessBelow, settings.colorSpace);
 
 // Generate active line
       for vt := tCoor.y to tCoor.y + (sf div 2) - 1 do
@@ -164,7 +157,7 @@ end;
 
 procedure TDynScanlines.SetBrightnessFromAboveLine(ba: double);
 begin
-  if ((ba >= 0.0) and (ba <= 255.0)) then
+  if ((ba >= 0) and (ba <= 1)) then
     settings.brightnessAbove := ba;
 end;
 
@@ -175,8 +168,18 @@ end;
 
 procedure TDynScanlines.SetBrightnessFromBelowLine(bb: double);
 begin
-  if ((bb >= 0.0) and (bb <= 255.0)) then
+  if ((bb >= 0) and (bb <= 1)) then
     settings.brightnessBelow := bb;
+end;
+
+function TDynScanlines.GetColorSpace: TColorSpace;
+begin
+  result := settings.colorSpace;
+end;
+
+procedure TDynScanlines.SetColorSpace(cs: TColorSpace);
+begin
+  settings.colorSpace := cs;
 end;
 
 constructor TDynScanlines.Create(windowWidth: integer = TGTWINDOWX_DS; windowHeight: integer = TGTWINDOWY_DS);
@@ -188,8 +191,9 @@ begin
   with settings do
   begin
     scalingFactor := 2;
-    brightnessAbove := 53.75;
-    brightnessBelow := 53.75;
+    brightnessAbove := 0.210784; // 53.75
+    brightnessBelow := 0.210784; // 53.75
+    colorSpace := csLinearRGB;
   end;
 end;
 
